@@ -18,10 +18,13 @@ jobs:
               run: uv python install 3.14.4
 
             - name: "Install dependencies"
-              run: uv sync --dev
+              run: uv sync --all-groups
 
             - name: "Run Ruff checks"
               run: uv run ruff check
 
-            - name: "Run tests"
-              run: uv run pytest tests
+            - name: "Run Ruff formatting"
+              run: uv run ruff format --check
+
+            - name: "Run Pytest tests"
+              run: uv run pytest
