@@ -1,0 +1,27 @@
+on:
+    push:
+        branches:
+            - "master"
+            - "main"
+
+jobs:
+    run_and_test:
+        runs-on: "ubuntu-latest"
+        
+        steps:
+            - uses: actions/checkout@6
+            
+            - name: "Install UV"
+              uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+
+            - name: "Setup Python"
+              run: uv python install --3.14.4
+
+            - name: "Install dependencies"
+              run: uv sync --dev
+
+            - name: "Run Ruff checks"
+              run: uv run ruff check
+
+            - name: "Run tests"
+              run: uv run pytest tests
