@@ -68,13 +68,12 @@ ruff = { "parenthesize-tuple-in-subscript" = true }
 pylint = { "max-nested-blocks" = 4, "max-args" = 4 }
 pyupgrade = { "keep-runtime-typing" = true }
 typing-extensions = false
-typing-modules = ["sqlanca._interanls.typingtools"]
+#typing-modules = ["sqlanca._interanls.typingtools"]
 
 
 [tool.ruff]
 line-length = 80
 indent-width = 4
 output-format = "github"
-show-fixes = true
 src = ["src", "tests"]
 target-version = "py314"
