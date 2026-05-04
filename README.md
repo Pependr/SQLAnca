@@ -2,4 +2,6 @@
 
 ToDo:
 - db IO
-- Data frames constraction and validation
+- Data frames fluent interface
+- Data frames validation
+- Dataclasses integration
