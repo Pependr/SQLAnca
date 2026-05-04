@@ -205,7 +205,7 @@ cython_debug/
 tempCodeRunnerFile.py
 
 # Ruff stuff:
-.ruff_cache/
+.ruff_cache
 
 # PyPI configuration file
 .pypirc
