@@ -68,7 +68,6 @@ ruff = { "parenthesize-tuple-in-subscript" = true }
 pylint = { "max-nested-blocks" = 4, "max-args" = 4 }
 pyupgrade = { "keep-runtime-typing" = true }
 typing-extensions = false
-#typing-modules = ["sqlanca._interanls.typingtools"]
 
 
 [tool.ruff]
