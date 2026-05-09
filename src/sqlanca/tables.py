@@ -30,7 +30,10 @@ class TableConnection:
 		return self
 
 	def __exit__(
-		self, exc_type: type[Exception] | None, exc: Exception | None, tb: Any,
+		self,
+		exc_type: type[Exception] | None,
+		exc: Exception | None,
+		tb: Any,
 	) -> None:
 		if exc is not None:
 			self.conn.rollback()
@@ -47,9 +50,11 @@ class TableConnection:
 	def create(self) -> None:
 		for col in self.table.columns:
 			if col.collation is not None:
-				self.conn.create_collation(f"{col.name}_collation", col.collation)
+				self.conn.create_collation(
+					f"{col.name}_collation", col.collation
+				)
 		self.conn.commit()
-		
+
 		with self.__cursor__() as cur:
 			cur.execute(self.table.query, self.table.column_defaults)
 
@@ -76,5 +81,8 @@ class Table:
 
 	@property
 	def column_defaults(self) -> tuple[Any, ...]:
-		return tuple(col.default for col in self.columns
-					if col.default is not __MISSING__)
+		return tuple(
+			col.default
+			for col in self.columns
+			if col.default is not __MISSING__
+		)

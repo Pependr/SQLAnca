@@ -37,5 +37,4 @@ class Column[T]:
 		if self.collation is not None:
 			query.append(f"COLLATE {self.name}_collation")
 
-
 		return " ".join(query)
