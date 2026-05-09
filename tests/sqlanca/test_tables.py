@@ -4,18 +4,19 @@ from sqlanca.constraints import NotNull, Unique, PrimaryKey
 
 
 def test_table_query() -> None:
-    test_table = Table(
-        "test",
-        Column("unique_col", "TEXT", constraints=(Unique(), NotNull())),
-        Column("id", "INTEGER", constraints=(PrimaryKey(),)),
-    )
+	test_table = Table(
+		"test",
+		Column("unique_col", "TEXT", constraints=(Unique(), NotNull())),
+		Column("id", "INTEGER", constraints=(PrimaryKey(),)),
+	)
 
-    with test_table.connect(":memory:") as table:
-        table.create()
-        with table.__cursor__() as cur:
-            cur.execute("INSERT INTO test (unique_col) VALUES ('bruh'), ('dude'), ('man')")
-            cur.execute("SELECT * FROM test")
-            out = cur.fetchall()
+	with test_table.connect(":memory:") as table:
+		table.create()
+		with table.__cursor__() as cur:
+			cur.execute(
+				"INSERT INTO test (unique_col) VALUES ('bruh'), ('dude'), ('man')"
+			)
+			cur.execute("SELECT * FROM test")
+			out = cur.fetchall()
 
-
-    assert out == [("bruh", 1), ("dude", 2), ("man", 3)]
+	assert out == [("bruh", 1), ("dude", 2), ("man", 3)]
