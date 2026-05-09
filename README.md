@@ -1,7 +1,14 @@
 # SQLAnca
 
 ToDo:
-- db IO
-- Data frames fluent interface
-- Data frames validation
-- Dataclasses integration
+- Fix collations
+- Fix defaults
+- Write pytests
+- Make table creation less verbose
+- TableConnection.insert and TableConnection.fetch methods
+- More pytests
+- Foreign and Generated columns as Column subclasses
+- Tables from dataclasses
+- Virtual tables from .csv files
+- Virtual tables from python generators
+- Enum support

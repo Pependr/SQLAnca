@@ -1,30 +1,41 @@
-from typing import Protocol, Any
-from dataclasses import dataclass
-from sqlite3 import Connection
+from typing import Protocol, Callable, Literal
+from dataclasses import dataclass, KW_ONLY
+
+
+type ValidatorFn[T] = Callable[[T], bool]
+type CollationFn = Callable[[str, str], int]
 
 
 class Constraint(Protocol):
-	repr: str
+	@property
+	def query(self) -> str: ...
 
-	def query(self, conn: Connection) -> str: ...
+
+__MISSING__: Literal["MISSING"] = "MISSING"
 
 
 @dataclass(frozen=True, slots=True)
-class Column:
+class Column[T]:
 	name: str
 	type: str
-	constaints: tuple[Constraint, ...] = ()
+	_: KW_ONLY
+	default: T | Literal["MISSING"] = __MISSING__
+	collation: CollationFn | None = None
+	constraints: tuple[Constraint, ...] = ()
+	validators: tuple[ValidatorFn[T], ...] = ()
 
-	def assemble(self, conn: Connection) -> tuple[str, list[Any]]:
+	@property
+	def query(self) -> str:
 		query: list[str] = [self.name, self.type]
-		values: list[Any] = []
 
-		for c in self.constaints:
-			if "?" in c.repr:
-				if hasattr(c, "value"):
-					values.append(getattr(c, "value"))
-				else:
-					values.append(self.name)
-			query.append(c.query(conn))
+		for c in self.constraints:
+			query.append(c.query)
 
-		return " ".join(query), values
+		if self.default is not __MISSING__:
+			query.append("DEFAULT ?")
+
+		if self.collation is not None:
+			query.append(f"COLLATE {self.name}_collation")
+
+
+		return " ".join(query)
