@@ -1,8 +1,6 @@
 # SQLAnca
 
 ToDo:
-- Fix collations
-- Fix defaults
 - Write pytests
 - Make table creation less verbose
 - TableConnection.insert and TableConnection.fetch methods

@@ -1,6 +1,4 @@
-from sqlanca.columns import __MISSING__
-
-from typing import Protocol, Self, Any, ReadOnly, Generator, Callable
+from typing import Protocol, Self, Any, Generator, Callable
 from os import PathLike
 from contextlib import contextmanager
 
@@ -11,22 +9,35 @@ type CollationFn = Callable[[str, str], int]
 
 
 class Column[T](Protocol):
-	name: ReadOnly[str]
-	type: ReadOnly[str]
-	default: ReadOnly[T]
-	collation: ReadOnly[CollationFn | None]
+	name: str
+	type: str
+	collation: CollationFn | None = None
+
+	@property
+	def query(self) -> str: ...
+
+
+class AnyTable(Protocol):
+	columns: tuple[Column[Any], ...]
 
 	@property
 	def query(self) -> str: ...
 
 
 class TableConnection:
-	def __init__(self, path: str | PathLike[Any], table: Table) -> None:
+	def __init__(self, path: str | PathLike[Any], table: AnyTable) -> None:
 		self.path = path
 		self.table = table
 
 	def __enter__(self) -> Self:
 		self.conn = sql.connect(self.path, autocommit=False)
+
+		for col in self.table.columns:
+			if col.collation is not None:
+				self.conn.create_collation(
+					f"{col.name}_collation", col.collation
+				)
+
 		return self
 
 	def __exit__(
@@ -48,15 +59,8 @@ class TableConnection:
 		cur.close()
 
 	def create(self) -> None:
-		for col in self.table.columns:
-			if col.collation is not None:
-				self.conn.create_collation(
-					f"{col.name}_collation", col.collation
-				)
-		self.conn.commit()
-
 		with self.__cursor__() as cur:
-			cur.execute(self.table.query, self.table.column_defaults)
+			cur.execute(self.table.query)
 
 
 class Table:
@@ -68,21 +72,9 @@ class Table:
 		return TableConnection(path, self)
 
 	@property
-	def query(self) -> str:
-		return f"CREATE TABLE {self.name} ({", ".join(self.column_queries)})"
-
-	@property
-	def column_names(self) -> tuple[str, ...]:
-		return tuple(col.name for col in self.columns)
-
-	@property
 	def column_queries(self) -> tuple[str, ...]:
 		return tuple(col.query for col in self.columns)
 
 	@property
-	def column_defaults(self) -> tuple[Any, ...]:
-		return tuple(
-			col.default
-			for col in self.columns
-			if col.default is not __MISSING__
-		)
+	def query(self) -> str:
+		return f"CREATE TABLE {self.name} ({", ".join(self.column_queries)})"

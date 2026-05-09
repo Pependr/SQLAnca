@@ -1,3 +1,5 @@
+from sqlanca.__internals__ import __MISSING__
+
 from typing import Protocol, Callable, Literal
 from dataclasses import dataclass, KW_ONLY
 
@@ -9,9 +11,6 @@ type CollationFn = Callable[[str, str], int]
 class Constraint(Protocol):
 	@property
 	def query(self) -> str: ...
-
-
-__MISSING__: Literal["MISSING"] = "MISSING"
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,9 +29,6 @@ class Column[T]:
 
 		for c in self.constraints:
 			query.append(c.query)
-
-		if self.default is not __MISSING__:
-			query.append("DEFAULT ?")
 
 		if self.collation is not None:
 			query.append(f"COLLATE {self.name}_collation")
