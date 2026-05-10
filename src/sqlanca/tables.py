@@ -1,19 +1,29 @@
 import sqlite3 as sql
 from contextlib import contextmanager
 from os import PathLike
-from typing import Any, Generator, Protocol, Self
+from typing import Any, Callable, Generator, Protocol, Self
+
+from sqlanca.__internals__ import __MISSING__
+
+type ValidatorFn[T] = Callable[[T], bool]
 
 
-class Column(Protocol):
+class Column[T](Protocol):
 	@property
 	def name(self) -> str: ...
 
 	@property
+	def default(self) -> T: ...
+
+	@property
 	def query(self) -> str: ...
+
+	def validate(self, value: T) -> T: ...
 
 
 class AnyTable(Protocol):
-	columns: tuple[Column, ...]
+	name: str
+	columns: tuple[Column[Any], ...]
 
 	@property
 	def query(self) -> str: ...
@@ -50,11 +60,41 @@ class TableConnection:
 		with self.__cursor__() as cur:
 			cur.execute(self.table.query)
 
+	def insert(self, **kwargs: Any) -> None:
+		inputs: dict[str, Any] = {}
+
+		for col in self.table.columns:
+			if col.name not in kwargs:
+				if col.default is not __MISSING__:
+					inputs[col.name] = col.default
+				continue
+
+			inputs[col.name] = col.validate(kwargs[col.name])
+
+		with self.__cursor__() as cur:
+			cur.execute(
+				f"""INSERT INTO {self.table.name} ({", ".join(inputs.keys())})
+				VALUES ({", ".join("?" for _ in inputs)})""".replace("\n", " "),
+				tuple(inputs.values()),
+			)
+
+	def iter_column(
+		self, col_name: str, *conditions: Callable[[Any], bool]
+	) -> Generator[Any, None, None]:
+		with self.__cursor__() as cur:
+			cur.execute(f"SELECT {col_name} FROM {self.table.name}")
+			while out := cur.fetchone():
+				for condition in conditions:
+					if not condition(out[0]):
+						break
+				else:
+					yield out[0]
+
 
 class Table:
-	def __init__(self, name: str, *cols: Column) -> None:
+	def __init__(self, name: str, *cols: Column[Any]) -> None:
 		self.name = name
-		self.columns: tuple[Column, ...] = cols
+		self.columns: tuple[Column[Any], ...] = cols
 
 	def connect(self, path: str | PathLike[Any]) -> TableConnection:
 		return TableConnection(path, self)
