@@ -1,22 +1,13 @@
-from typing import Protocol, Self, Any, Generator, Callable
+from typing import Protocol, Self, Any, Generator
 from os import PathLike
 from contextlib import contextmanager
 
 import sqlite3 as sql
 
 
-type CollationFn = Callable[[str, str], int]
-
-
 class Column(Protocol):
 	@property
 	def name(self) -> str: ...
-
-	@property
-	def type(self) -> str: ...
-
-	@property
-	def collation(self) -> CollationFn | None: ...
 
 	@property
 	def query(self) -> str: ...
@@ -36,14 +27,6 @@ class TableConnection:
 
 	def __enter__(self) -> Self:
 		self.conn = sql.connect(self.path, autocommit=False)
-
-		for col in self.table.columns:
-			if col.collation is not None:
-				self.conn.create_collation(
-					f"{col.name}_collation",
-					col.collation,
-				)
-
 		return self
 
 	def __exit__(
