@@ -32,7 +32,6 @@ def test_table_create_error() -> None:
 		Column("id", "INTEGER", constraints=(PrimaryKey(),)),
 	)
 
-
 	with test_table.connect(":memory:") as table:
 		table.create()
 		with table.__cursor__() as cur:
@@ -51,12 +50,10 @@ def test_table_create_collation() -> None:
 	def len_collation(a: str, b: str) -> int:
 		return (len(a) > len(b)) - (len(a) < len(b))
 
-
 	test_table = Table(
 		"test",
 		Column("collated_column", "TEXT", collation=len_collation),
 	)
-
 
 	with test_table.connect(":memory:") as table:
 		table.create()
@@ -71,6 +68,5 @@ def test_table_create_collation() -> None:
 			cur.execute("SELECT * FROM test ORDER BY collated_column")
 			out2 = cur.fetchall()
 
-	
-	assert out1 == [('ccccc',), ('aaa',), ('bbbbbbb',)]
+	assert out1 == [("ccccc",), ("aaa",), ("bbbbbbb",)]
 	assert out2 == [("aaa",), ("ccccc",), ("bbbbbbb",)]
