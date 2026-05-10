@@ -1,9 +1,10 @@
-from sqlanca.tables import Table
-from sqlanca.columns import Column
-from sqlanca.constraints import NotNull, Unique, PrimaryKey
+import sqlite3 as sql
 
 import pytest as pt
-import sqlite3 as sql
+
+from sqlanca.columns import Column
+from sqlanca.constraints import NotNull, PrimaryKey, Unique
+from sqlanca.tables import Table
 
 
 def test_table_create() -> None:

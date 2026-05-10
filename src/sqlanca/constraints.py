@@ -1,7 +1,6 @@
-from typing import Callable
 from dataclasses import dataclass
 from sqlite3 import Connection
-
+from typing import Callable
 
 type ConflictFn = Callable[[Connection], None]
 

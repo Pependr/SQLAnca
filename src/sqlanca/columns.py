@@ -1,8 +1,7 @@
+from dataclasses import KW_ONLY, dataclass
+from typing import Callable, Literal, Protocol
+
 from sqlanca.__internals__ import __MISSING__
-
-from typing import Protocol, Callable, Literal
-from dataclasses import dataclass, KW_ONLY
-
 
 type ValidatorFn[T] = Callable[[T], bool]
 

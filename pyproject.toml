@@ -1,7 +1,7 @@
 [project]
 name = "sqlanca"
 version = "0.1.0"
-description = "A python framework for strictly typed data tables based off SQLite."
+description = "A python framework for SQLite data tables."
 readme = "README.md"
 authors = [
     { name = "Pependr", email = "antonkudrikov88@gmail.com" }
@@ -62,11 +62,11 @@ docstring-code-format = true
 docstring-code-line-length = 100
 
 
-
 [tool.ruff.lint]
 ruff = { "parenthesize-tuple-in-subscript" = true }
 pylint = { "max-nested-blocks" = 4, "max-args" = 4 }
 pyupgrade = { "keep-runtime-typing" = true }
+isort = { lines-after-imports = 1 }
 typing-extensions = false
 
 

@@ -1,8 +1,7 @@
-from typing import Protocol, Self, Any, Generator
-from os import PathLike
-from contextlib import contextmanager
-
 import sqlite3 as sql
+from contextlib import contextmanager
+from os import PathLike
+from typing import Any, Generator, Protocol, Self
 
 
 class Column(Protocol):
