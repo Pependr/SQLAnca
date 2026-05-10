@@ -8,17 +8,22 @@ import sqlite3 as sql
 type CollationFn = Callable[[str, str], int]
 
 
-class Column[T](Protocol):
-	name: str
-	type: str
-	collation: CollationFn | None = None
+class Column(Protocol):
+	@property
+	def name(self) -> str: ...
+
+	@property
+	def type(self) -> str: ...
+
+	@property
+	def collation(self) -> CollationFn | None: ...
 
 	@property
 	def query(self) -> str: ...
 
 
 class AnyTable(Protocol):
-	columns: tuple[Column[Any], ...]
+	columns: tuple[Column, ...]
 
 	@property
 	def query(self) -> str: ...
@@ -35,7 +40,8 @@ class TableConnection:
 		for col in self.table.columns:
 			if col.collation is not None:
 				self.conn.create_collation(
-					f"{col.name}_collation", col.collation
+					f"{col.name}_collation",
+					col.collation,
 				)
 
 		return self
@@ -64,9 +70,9 @@ class TableConnection:
 
 
 class Table:
-	def __init__(self, name: str, *cols: Column[Any]) -> None:
+	def __init__(self, name: str, *cols: Column) -> None:
 		self.name = name
-		self.columns: tuple[Column[Any], ...] = cols
+		self.columns: tuple[Column, ...] = cols
 
 	def connect(self, path: str | PathLike[Any]) -> TableConnection:
 		return TableConnection(path, self)
