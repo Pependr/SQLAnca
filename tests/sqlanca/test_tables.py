@@ -2,19 +2,20 @@ import sqlite3 as sql
 
 import pytest as pt
 
-from sqlanca.columns import Column, ValidationError
+from sqlanca.columns import Column, Type, ValidationError
+from sqlanca.io import Connection
 from sqlanca.tables import Table
 
 
 def test_table_create() -> None:
 	test_table = Table(
 		"test",
-		Column("unique_col", "TEXT", not_null=True, unique=True),
-		Column("id", "INTEGER", primary_key=True),
+		Column("unique_col", Type.STR, not_null=True, unique=True),
+		Column("id", Type.INT, primary_key=True),
 	)
 
-	with test_table.connect(":memory:") as conn:
-		conn.create()
+	with Connection(":memory:") as conn:
+		conn.create(test_table)
 		with conn.__cursor__() as cur:
 			cur.execute(
 				"INSERT INTO test (unique_col) VALUES ('bruh'), ('dude'), ('man')"
@@ -28,12 +29,12 @@ def test_table_create() -> None:
 def test_table_create_error() -> None:
 	test_table = Table(
 		"test",
-		Column("unique_col", "TEXT", not_null=True, unique=True),
-		Column("id", "INTEGER", primary_key=True),
+		Column("unique_col", Type.STR, not_null=True, unique=True),
+		Column("id", Type.INT, primary_key=True),
 	)
 
-	with test_table.connect(":memory:") as conn:
-		conn.create()
+	with Connection(":memory:") as conn:
+		conn.create(test_table)
 		with conn.__cursor__() as cur:
 			cur.execute(
 				"INSERT INTO test (unique_col) VALUES ('bruh'), ('dude'), ('man')"
@@ -49,14 +50,14 @@ def test_table_create_error() -> None:
 def test_table_insert() -> None:
 	test_table = Table(
 		"test",
-		Column("name", "TEXT", not_null=True),
+		Column("name", Type.STR, not_null=True),
 	)
 
-	with test_table.connect(":memory:") as conn:
-		conn.create()
+	with Connection(":memory:") as conn:
+		conn.create(test_table)
 
-		conn.insert(name="Bob")
-		conn.insert(name="Alice")
+		conn.insert(test_table, name="Bob")
+		conn.insert(test_table, name="Alice")
 
 		with conn.__cursor__() as cur:
 			cur.execute("SELECT * FROM test")
@@ -68,15 +69,15 @@ def test_table_insert() -> None:
 def test_table_insert_default() -> None:
 	test_table = Table(
 		"test",
-		Column("name", "TEXT", not_null=True),
-		Column("age", "INTEGER", default=None),
+		Column("name", Type.STR, not_null=True),
+		Column("age", Type.INT, default=None),
 	)
 
-	with test_table.connect(":memory:") as conn:
-		conn.create()
+	with Connection(":memory:") as conn:
+		conn.create(test_table)
 
-		conn.insert(name="Bob", age=18)
-		conn.insert(name="Alice")
+		conn.insert(test_table, name="Bob", age=18)
+		conn.insert(test_table, name="Alice")
 
 		with conn.__cursor__() as cur:
 			cur.execute("SELECT * FROM test")
@@ -91,32 +92,32 @@ def test_table_insert_validation_error() -> None:
 
 	test_table = Table(
 		"test",
-		Column("name", "TEXT", not_null=True),
-		Column("age", "INTEGER", validators=(valid_age,)),
+		Column("name", Type.STR, not_null=True),
+		Column("age", Type.INT, validators=(valid_age,)),
 	)
 
-	with test_table.connect(":memory:") as conn:
-		conn.create()
+	with Connection(":memory:") as conn:
+		conn.create(test_table)
 
 		with pt.raises(ValidationError):
-			conn.insert(name="Alice", age=16)
+			conn.insert(test_table, name="Alice", age=16)
 
 
 def test_table_iter_column() -> None:
 	test_table = Table(
 		"test",
-		Column("id", "INTEGER", primary_key=True),
-		Column("name", "TEXT"),
+		Column("id", Type.INT, primary_key=True),
+		Column("name", Type.STR),
 	)
 
-	with test_table.connect(":memory:") as conn:
-		conn.create()
+	with Connection(":memory:") as conn:
+		conn.create(test_table)
 
-		conn.insert(name="Bob")
-		conn.insert(name="Alice")
+		conn.insert(test_table, name="Bob")
+		conn.insert(test_table, name="Alice")
 
-		out1 = tuple(conn.iter_column("name"))
-		out2 = tuple(conn.iter_column("id"))
+		out1 = tuple(conn.iter_column(test_table, "name"))
+		out2 = tuple(conn.iter_column(test_table, "id"))
 
 	assert out1 == ("Bob", "Alice")
 	assert out2 == (1, 2)
@@ -125,18 +126,20 @@ def test_table_iter_column() -> None:
 def test_table_iter_column_condition() -> None:
 	test_table = Table(
 		"test",
-		Column("id", "INTEGER", primary_key=True),
-		Column("name", "TEXT"),
+		Column("id", Type.INT, primary_key=True),
+		Column("name", Type.STR),
 	)
 
-	with test_table.connect(":memory:") as conn:
-		conn.create()
+	with Connection(":memory:") as conn:
+		conn.create(test_table)
 
-		conn.insert(name="Bob")
-		conn.insert(name="Alice")
+		conn.insert(test_table, name="Bob")
+		conn.insert(test_table, name="Alice")
 
-		out1 = tuple(conn.iter_column("name", lambda s: len(s) == 3))
-		out2 = tuple(conn.iter_column("id", lambda x: x % 2 == 0))
+		out1 = tuple(
+			conn.iter_column(test_table, "name", lambda s: len(s) == 3)
+		)
+		out2 = tuple(conn.iter_column(test_table, "id", lambda x: x % 2 == 0))
 
 	assert out1 == ("Bob",)
 	assert out2 == (2,)
@@ -145,17 +148,17 @@ def test_table_iter_column_condition() -> None:
 def test_table_iter_rows() -> None:
 	test_table = Table(
 		"test",
-		Column("id", "INTEGER", primary_key=True),
-		Column("name", "TEXT"),
+		Column("id", Type.INT, primary_key=True),
+		Column("name", Type.STR),
 	)
 
-	with test_table.connect(":memory:") as conn:
-		conn.create()
+	with Connection(":memory:") as conn:
+		conn.create(test_table)
 
-		conn.insert(name="Bob")
-		conn.insert(name="Alice")
+		conn.insert(test_table, name="Bob")
+		conn.insert(test_table, name="Alice")
 
-		out1, out2 = tuple(conn.iter_rows())
+		out1, out2 = tuple(conn.iter_rows(test_table))
 
 	assert out1 == (1, "Bob")
 	assert out2 == (2, "Alice")
@@ -164,17 +167,17 @@ def test_table_iter_rows() -> None:
 def test_table_iter_rows_conditions() -> None:
 	test_table = Table(
 		"test",
-		Column("id", "INTEGER", primary_key=True),
-		Column("name", "TEXT"),
+		Column("id", Type.INT, primary_key=True),
+		Column("name", Type.STR),
 	)
 
-	with test_table.connect(":memory:") as conn:
-		conn.create()
+	with Connection(":memory:") as conn:
+		conn.create(test_table)
 
-		conn.insert(name="Bob")
-		conn.insert(name="Alice")
+		conn.insert(test_table, name="Bob")
+		conn.insert(test_table, name="Alice")
 
-		out = tuple(conn.iter_rows(id=lambda x: x % 2 == 0))
+		out = tuple(conn.iter_rows(test_table, id=lambda x: x % 2 == 0))
 
 	assert out[0] == (2, "Alice")
 	assert len(out) == 1

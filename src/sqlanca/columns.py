@@ -1,9 +1,18 @@
 from dataclasses import KW_ONLY, dataclass
-from typing import Callable, Literal
+from enum import StrEnum
+from typing import Callable, cast
 
-from sqlanca.__internals__ import __MISSING__
+
+class __MISSING_TYPE__: ...
+
+
+__MISSING__: __MISSING_TYPE__ = __MISSING_TYPE__()
+
 
 type ValidatorFn[T] = Callable[[T], bool]
+
+
+class ColumnError(AttributeError): ...
 
 
 class ValidationError[T](ValueError):
@@ -12,16 +21,23 @@ class ValidationError[T](ValueError):
 	) -> None:
 		self.value = value
 		self.validator = validator
-		self.message = message
 		super().__init__(message)
+
+
+class Type(StrEnum):
+	STR = "TEXT"
+	INT = "INTEGER"
+	FLOAT = "REAL"
+	NONE = "NULL"
+	BYTES = "BLOB"
 
 
 @dataclass(frozen=True, slots=True)
 class Column[T]:
 	name: str
-	type: str
+	type: Type
 	_: KW_ONLY
-	default: T | Literal["MISSING"] = __MISSING__
+	default: T | __MISSING_TYPE__ = __MISSING__
 	not_null: bool = False
 	unique: bool = False
 	primary_key: bool = False
@@ -41,6 +57,12 @@ class Column[T]:
 			query.extend(("PRIMARY", "KEY"))
 
 		return " ".join(query)
+
+	@property
+	def public_default(self) -> T:
+		if self.default is __MISSING__:
+			raise ColumnError(f"Column {self.name} has no default value")
+		return cast(T, self.default)
 
 	def validate(self, value: T) -> None:
 		for validator in self.validators:
