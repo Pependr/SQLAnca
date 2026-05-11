@@ -4,16 +4,18 @@ from os import PathLike
 from typing import Any, Callable, Generator, Protocol, Self
 
 
-class AnyTable(Protocol):
-	name: str
-
+class Creatable(Protocol):
 	@property
 	def create_query(self) -> str: ...
 
+
+class Insertable(Protocol):
 	def insert_query(
 		self, inputs: dict[str, Any]
-	) -> tuple[str, tuple[Any]]: ...
+	) -> tuple[str, tuple[Any, ...]]: ...
 
+
+class Selectable(Protocol):
 	def get_col_pos(self, col_name: str) -> int: ...
 
 	def select_col(self, col_name: str) -> str: ...
@@ -48,16 +50,19 @@ class Connection:
 		yield cur
 		cur.close()
 
-	def create(self, table: AnyTable) -> None:
+	def create(self, table: Creatable) -> None:
 		with self.__cursor__() as cur:
 			cur.execute(table.create_query)
 
-	def insert(self, table: AnyTable, **kwargs: Any) -> None:
+	def insert(self, table: Insertable, **kwargs: Any) -> None:
 		with self.__cursor__() as cur:
 			cur.execute(*table.insert_query(kwargs))
 
 	def iter_column(
-		self, table: AnyTable, col_name: str, *conditions: Callable[[Any], bool]
+		self,
+		table: Selectable,
+		col_name: str,
+		*conditions: Callable[[Any], bool],
 	) -> Generator[Any, None, None]:
 		with self.__cursor__() as cur:
 			cur.execute(table.select_col(col_name))
@@ -69,7 +74,7 @@ class Connection:
 					yield out[0]
 
 	def iter_rows(
-		self, table: AnyTable, **col_conditions: Callable[[Any], bool]
+		self, table: Selectable, **col_conditions: Callable[[Any], bool]
 	) -> Generator[tuple[Any, ...], None, None]:
 		with self.__cursor__() as cur:
 			cur.execute(table.select_all)
