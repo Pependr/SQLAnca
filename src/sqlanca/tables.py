@@ -8,6 +8,9 @@ from sqlanca.__internals__ import __MISSING__
 type ValidatorFn[T] = Callable[[T], bool]
 
 
+class TableError(ValueError): ...
+
+
 class Column[T](Protocol):
 	@property
 	def name(self) -> str: ...
@@ -18,12 +21,12 @@ class Column[T](Protocol):
 	@property
 	def query(self) -> str: ...
 
-	def validate(self, value: T) -> T: ...
+	def validate(self, value: T) -> None: ...
 
 
 class AnyTable(Protocol):
 	name: str
-	columns: tuple[Column[Any], ...]
+	columns: dict[str, Column[Any]]
 
 	@property
 	def query(self) -> str: ...
@@ -63,13 +66,15 @@ class TableConnection:
 	def insert(self, **kwargs: Any) -> None:
 		inputs: dict[str, Any] = {}
 
-		for col in self.table.columns:
+		for col in self.table.columns.values():
 			if col.name not in kwargs:
 				if col.default is not __MISSING__:
 					inputs[col.name] = col.default
 				continue
 
-			inputs[col.name] = col.validate(kwargs[col.name])
+			col.validate(kwargs[col.name])
+
+			inputs[col.name] = kwargs[col.name]
 
 		with self.__cursor__() as cur:
 			cur.execute(
@@ -90,18 +95,41 @@ class TableConnection:
 				else:
 					yield out[0]
 
+	def iter_rows(
+		self, **col_conditions: Callable[[Any], bool]
+	) -> Generator[tuple[Any, ...], None, None]:
+		with self.__cursor__() as cur:
+			cur.execute(f"SELECT * FROM {self.table.name}")
+			while out := cur.fetchone():
+				for col_name, cond in col_conditions.items():
+					for i, name in enumerate(self.table.columns):
+						if name == col_name:
+							break
+					else:
+						raise TableError(
+							f"Table {self.table.name} has no column {col_name}"
+						)
+
+					if not cond(out[i]):
+						break
+				else:
+					yield out
+
 
 class Table:
 	def __init__(self, name: str, *cols: Column[Any]) -> None:
 		self.name = name
-		self.columns: tuple[Column[Any], ...] = cols
+		self.columns: dict[str, Column[Any]] = {}
+
+		for col in cols:
+			self.columns[col.name] = col
 
 	def connect(self, path: str | PathLike[Any]) -> TableConnection:
 		return TableConnection(path, self)
 
 	@property
 	def column_queries(self) -> tuple[str, ...]:
-		return tuple(col.query for col in self.columns)
+		return tuple(col.query for col in self.columns.values())
 
 	@property
 	def query(self) -> str:

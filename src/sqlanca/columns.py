@@ -1,14 +1,9 @@
 from dataclasses import KW_ONLY, dataclass
-from typing import Callable, Literal, Protocol
+from typing import Callable, Literal
 
 from sqlanca.__internals__ import __MISSING__
 
 type ValidatorFn[T] = Callable[[T], bool]
-
-
-class Constraint(Protocol):
-	@property
-	def query(self) -> str: ...
 
 
 class ValidationError[T](ValueError):
@@ -27,19 +22,27 @@ class Column[T]:
 	type: str
 	_: KW_ONLY
 	default: T | Literal["MISSING"] = __MISSING__
-	constraints: tuple[Constraint, ...] = ()
+	not_null: bool = False
+	unique: bool = False
+	primary_key: bool = False
 	validators: tuple[ValidatorFn[T], ...] = ()
 
 	@property
 	def query(self) -> str:
 		query: list[str] = [self.name, self.type]
 
-		for c in self.constraints:
-			query.append(c.query)
+		if self.not_null:
+			query.extend(("NOT", "NULL"))
+
+		if self.unique:
+			query.append("UNIQUE")
+
+		if self.primary_key:
+			query.extend(("PRIMARY", "KEY"))
 
 		return " ".join(query)
 
-	def validate(self, value: T) -> T:
+	def validate(self, value: T) -> None:
 		for validator in self.validators:
 			if not validator(value):
 				raise ValidationError(
@@ -47,5 +50,3 @@ class Column[T]:
 					validator,
 					f"{value} failed {validator.__name__} of col {self.name}",
 				)
-
-		return value

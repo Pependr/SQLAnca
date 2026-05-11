@@ -13,7 +13,7 @@ def test_column_validation() -> None:
 
 	value = "bruh"
 
-	assert col.validate(value) is value
+	col.validate(value)
 
 
 def test_column_validation_error() -> None:
