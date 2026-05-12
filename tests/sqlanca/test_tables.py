@@ -7,15 +7,53 @@ from sqlanca.io import Connection
 from sqlanca.tables import Table
 
 
-def test_table_create() -> None:
-	test_table = Table(
+@pt.fixture
+def unique_table() -> Table:
+	return Table(
 		"test",
 		Column("unique_col", Type.STR, not_null=True, unique=True),
 		Column("id", Type.INT, primary_key=True),
 	)
 
-	with Connection(":memory:") as conn:
-		conn.create(test_table)
+
+@pt.fixture
+def default_table() -> Table:
+	return Table(
+		"test",
+		Column("name", Type.STR, not_null=True),
+		Column("age", Type.INT, default=None),
+	)
+
+
+@pt.fixture
+def valid_table() -> Table:
+	def valid_age(x: int) -> bool:
+		return x >= 18
+
+	return Table(
+		"test",
+		Column("name", Type.STR, not_null=True),
+		Column("age", Type.INT, validators=(valid_age,)),
+	)
+
+
+@pt.fixture
+def iter_table() -> Table:
+	return Table(
+		"test",
+		Column("id", Type.INT, primary_key=True),
+		Column("name", Type.STR),
+	)
+
+
+@pt.fixture
+def conn() -> Connection:
+	return Connection(":memory:")
+
+
+def test_table_create(unique_table: Table, conn: Connection) -> None:
+	with conn:
+		conn.create(unique_table)
 		with conn.__cursor__() as cur:
 			cur.execute(
 				"INSERT INTO test (unique_col) VALUES ('bruh'), ('dude'), ('man')"
@@ -26,14 +64,9 @@ def test_table_create() -> None:
 	assert out == [("bruh", 1), ("dude", 2), ("man", 3)]
 
 
-def test_table_constraints() -> None:
-	test_table = Table(
-		"test",
-		Column("unique_col", Type.STR, not_null=True, unique=True),
-	)
-
-	with Connection(":memory:") as conn:
-		conn.create(test_table)
+def test_table_constraints(unique_table: Table, conn: Connection) -> None:
+	with conn:
+		conn.create(unique_table)
 		with conn.__cursor__() as cur:
 			cur.execute(
 				"INSERT INTO test (unique_col) VALUES ('bruh'), ('dude'), ('man')"
@@ -46,18 +79,12 @@ def test_table_constraints() -> None:
 				cur.execute("INSERT INTO test (unique_col) VALUES (NULL)")
 
 
-def test_table_insert() -> None:
-	test_table = Table(
-		"test",
-		Column("name", Type.STR, not_null=True),
-		Column("age", Type.INT, default=None),
-	)
+def test_table_insert(default_table: Table, conn: Connection) -> None:
+	with conn:
+		conn.create(default_table)
 
-	with Connection(":memory:") as conn:
-		conn.create(test_table)
-
-		conn.insert(test_table, name="Bob", age=18)
-		conn.insert(test_table, name="Alice")
+		conn.insert(default_table, name="Bob", age=18)
+		conn.insert(default_table, name="Alice")
 
 		with conn.__cursor__() as cur:
 			cur.execute("SELECT * FROM test")
@@ -66,59 +93,41 @@ def test_table_insert() -> None:
 	assert out == [("Bob", 18), ("Alice", None)]
 
 
-def test_table_insert_validation_error() -> None:
-	def valid_age(x: int) -> bool:
-		return x >= 18
-
-	test_table = Table(
-		"test",
-		Column("name", Type.STR, not_null=True),
-		Column("age", Type.INT, validators=(valid_age,)),
-	)
-
-	with Connection(":memory:") as conn:
-		conn.create(test_table)
+def test_table_insert_validation_error(
+	valid_table: Table, conn: Connection
+) -> None:
+	with conn:
+		conn.create(valid_table)
 
 		with pt.raises(ValidationError):
-			conn.insert(test_table, name="Alice", age=16)
+			conn.insert(valid_table, name="Alice", age=16)
 
 
-def test_table_iter_column() -> None:
-	test_table = Table(
-		"test",
-		Column("name", Type.STR),
-	)
+def test_table_iter_column(iter_table: Table, conn: Connection) -> None:
+	with conn:
+		conn.create(iter_table)
 
-	with Connection(":memory:") as conn:
-		conn.create(test_table)
+		conn.insert(iter_table, name="Bob")
+		conn.insert(iter_table, name="Alice")
 
-		conn.insert(test_table, name="Bob")
-		conn.insert(test_table, name="Alice")
-
-		out1 = tuple(conn.iter_column(test_table, "name"))
+		out1 = tuple(conn.iter_column(iter_table, "name"))
 		out2 = tuple(
-			conn.iter_column(test_table, "name", lambda s: len(s) == 3)
+			conn.iter_column(iter_table, "name", lambda s: len(s) == 3)
 		)
 
 	assert out1 == ("Bob", "Alice")
 	assert out2 == ("Bob",)
 
 
-def test_table_iter_rows() -> None:
-	test_table = Table(
-		"test",
-		Column("id", Type.INT, primary_key=True),
-		Column("name", Type.STR),
-	)
+def test_table_iter_rows(iter_table: Table, conn: Connection) -> None:
+	with conn:
+		conn.create(iter_table)
 
-	with Connection(":memory:") as conn:
-		conn.create(test_table)
+		conn.insert(iter_table, name="Bob")
+		conn.insert(iter_table, name="Alice")
 
-		conn.insert(test_table, name="Bob")
-		conn.insert(test_table, name="Alice")
-
-		out1 = tuple(conn.iter_rows(test_table))
-		out2 = tuple(conn.iter_rows(test_table, id=lambda x: x % 2 == 0))
+		out1 = tuple(conn.iter_rows(iter_table))
+		out2 = tuple(conn.iter_rows(iter_table, id=lambda x: x % 2 == 0))
 
 	assert out1 == ((1, "Bob"), (2, "Alice"))
 	assert out2 == ((2, "Alice"),)
