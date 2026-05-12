@@ -1,7 +1,19 @@
 import sqlite3 as sql
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from os import PathLike
 from typing import Any, Callable, Generator, Protocol, Self
+
+type PredicateFn = Callable[[Any], bool]
+
+
+def compose(*predicates: PredicateFn) -> PredicateFn:
+	def predicate(value: Any) -> bool:
+		for pr in predicates:
+			if not pr(value):
+				return False
+		return True
+
+	return predicate
 
 
 class Creatable(Protocol):
@@ -15,21 +27,12 @@ class Insertable(Protocol):
 	) -> tuple[str, tuple[Any, ...]]: ...
 
 
-class Selectable(Protocol):
-	def get_col_pos(self, col_name: str) -> int: ...
-
-	def select_col(self, col_name: str) -> str: ...
-
-	@property
-	def select_all(self) -> str: ...
-
-
 class Connection:
 	def __init__(self, path: str | PathLike[Any]) -> None:
-		self.path = path
+		self.__path__ = path
 
 	def __enter__(self) -> Self:
-		self.conn = sql.connect(self.path, autocommit=False)
+		self.__conn__ = sql.connect(self.__path__, autocommit=False)
 		return self
 
 	def __exit__(
@@ -39,16 +42,24 @@ class Connection:
 		tb: Any,
 	) -> None:
 		if exc is not None:
-			self.conn.rollback()
+			self.__conn__.rollback()
 		else:
-			self.conn.commit()
-		self.conn.close()
+			self.__conn__.commit()
+		self.__conn__.close()
 
 	@contextmanager
 	def __cursor__(self) -> Generator[sql.Cursor, None, None]:
-		cur = self.conn.cursor()
+		cur = self.__conn__.cursor()
 		yield cur
 		cur.close()
+
+	@contextmanager
+	def __func__(
+		self, fn: Callable[[Any], Any], name: str
+	) -> Generator[None, None, None]:
+		self.__conn__.create_function(name, 1, fn)
+		yield
+		self.__conn__.create_function(name, 1, None)
 
 	def create(self, table: Creatable) -> None:
 		with self.__cursor__() as cur:
@@ -60,28 +71,38 @@ class Connection:
 
 	def iter_column(
 		self,
-		table: Selectable,
+		table_name: str,
 		col_name: str,
-		*conditions: Callable[[Any], bool],
+		predicate: PredicateFn = lambda _: True,
 	) -> Generator[Any, None, None]:
-		with self.__cursor__() as cur:
-			cur.execute(table.select_col(col_name))
-			while out := cur.fetchone():
-				for condition in conditions:
-					if not condition(out[0]):
-						break
-				else:
-					yield out[0]
+		with self.__func__(predicate, f"{col_name}_pred"):
+			with self.__cursor__() as cur:
+				cur.execute(
+					f"""SELECT {col_name} FROM {table_name}
+					WHERE {col_name}_pred({col_name})=1"""
+				)
+
+				yield from (i[0] for i in cur.fetchall())
 
 	def iter_rows(
-		self, table: Selectable, **col_conditions: Callable[[Any], bool]
+		self, table_name: str, **predicates: PredicateFn
 	) -> Generator[tuple[Any, ...], None, None]:
-		with self.__cursor__() as cur:
-			cur.execute(table.select_all)
-			while out := cur.fetchone():
-				for col, cond in col_conditions.items():
-					i = table.get_col_pos(col)
-					if not cond(out[i]):
-						break
-				else:
-					yield out
+		if predicates == {}:
+			with self.__cursor__() as cur:
+				cur.execute(f"SELECT * FROM {table_name}")
+				yield from cur.fetchall()
+				return
+
+		with ExitStack() as stack:
+			for col, fn in predicates.items():
+				stack.enter_context(self.__func__(fn, f"{col}_pred"))
+
+			with self.__cursor__() as cur:
+				cur.execute(
+					f"""
+					SELECT * FROM {table_name}
+					WHERE {" AND ".join(f"{col}_pred({col})" for col in predicates)}
+					"""
+				)
+
+				yield from cur.fetchall()

@@ -6,6 +6,7 @@
     "python.analysis.extraPaths": [
         "{$workspaceFolder}/src"
     ],
+    "python.analysis.autoImportCompletions": true,
     "ruff.format.backend": "uv",
     "ruff.lineLength": 80,
     "ruff.trace.server": "verbose",

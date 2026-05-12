@@ -58,18 +58,3 @@ class Table:
 			f"INSERT INTO {self.name} ({d.join(f)}) VALUES ({d.join("?" * n)})",
 			tuple(f.values()),
 		)
-
-	def get_col_pos(self, col_name: str) -> int:
-		for i, name in enumerate(self.columns):
-			if name == col_name:
-				break
-		else:
-			raise TableError(f"Table {self.name} has no column {col_name}")
-		return i
-
-	def select_col(self, col_name: str) -> str:
-		return f"SELECT {col_name} FROM {self.name}"
-
-	@property
-	def select_all(self) -> str:
-		return f"SELECT * FROM {self.name}"

@@ -1,13 +1,7 @@
 from dataclasses import KW_ONLY, dataclass
 from enum import StrEnum
-from typing import Callable, cast
-
-
-class __MISSING_TYPE__: ...
-
-
-__MISSING__: __MISSING_TYPE__ = __MISSING_TYPE__()
-
+from types import EllipsisType
+from typing import Callable
 
 type ValidatorFn[T] = Callable[[T], bool]
 
@@ -37,7 +31,7 @@ class Column[T]:
 	name: str
 	type: Type
 	_: KW_ONLY
-	default: T | __MISSING_TYPE__ = __MISSING__
+	default: T | EllipsisType = ...
 	not_null: bool = False
 	unique: bool = False
 	primary_key: bool = False
@@ -60,9 +54,9 @@ class Column[T]:
 
 	@property
 	def public_default(self) -> T:
-		if self.default is __MISSING__:
+		if self.default is ...:
 			raise ColumnError(f"Column {self.name} has no default value")
-		return cast(T, self.default)
+		return self.default
 
 	def validate(self, value: T) -> None:
 		for validator in self.validators:

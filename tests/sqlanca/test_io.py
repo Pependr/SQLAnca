@@ -1,15 +1,22 @@
 from typing import Any, Sized
 
+import pytest as pt
+
 from sqlanca.io import Connection
 
 
-def test_conn_create() -> None:
+@pt.fixture
+def conn() -> Connection:
+	return Connection(":memory:")
+
+
+def test_conn_create(conn: Connection) -> None:
 	class MockCreateable:
 		@property
 		def create_query(self) -> str:
 			return "CREATE TABLE test (name TEXT)"
 
-	with Connection(":memory:") as conn:
+	with conn:
 		conn.create(MockCreateable())
 
 		with conn.__cursor__() as cur:
@@ -23,7 +30,7 @@ def test_conn_create() -> None:
 	assert out == "test"
 
 
-def test_conn_insert() -> None:
+def test_conn_insert(conn: Connection) -> None:
 	class MockInsertable:
 		def insert_query(
 			self, inputs: dict[str, Any]
@@ -33,7 +40,7 @@ def test_conn_insert() -> None:
 				("Linus", "Torvalds"),
 			)
 
-	with Connection(":memory:") as conn:
+	with conn:
 		with conn.__cursor__() as cur:
 			cur.execute("CREATE TABLE test (name TEXT, surname TEXT)")
 
@@ -47,53 +54,29 @@ def test_conn_insert() -> None:
 	assert out == ("Linus", "Torvalds")
 
 
-def test_conn_iter_column() -> None:
-	class MockSelectable:
-		def get_col_pos(self, col_name: str) -> int:
-			return 0
-
-		def select_col(self, col_name: str) -> str:
-			return "SELECT name FROM test"
-
-		@property
-		def select_all(self) -> str:
-			return "SELECT * FROM test"
-
+def test_conn_iter_column(conn: Connection) -> None:
 	def len_over_3(x: Sized) -> bool:
 		return len(x) > 3
 
-	with Connection(":memory:") as conn:
+	with conn:
 		with conn.__cursor__() as cur:
 			cur.execute("CREATE TABLE test (name TEXT)")
 			cur.execute("INSERT INTO test (name) VALUES ('Bruh')")
 			cur.execute("INSERT INTO test (name) VALUES ('Dude')")
 			cur.execute("INSERT INTO test (name) VALUES ('Man')")
 
-		out1 = tuple(conn.iter_column(MockSelectable(), "name"))
-		out2 = tuple(conn.iter_column(MockSelectable(), "name", len_over_3))
+		out1 = tuple(conn.iter_column("test", "name"))
+		out2 = tuple(conn.iter_column("test", "name", len_over_3))
 
 	assert out1 == ("Bruh", "Dude", "Man")
 	assert out2 == ("Bruh", "Dude")
 
 
-def test_conn_iter_rows() -> None:
-	class MockSelectable:
-		cols: tuple[str, ...] = ("name", "surname", "language")
-
-		def get_col_pos(self, col_name: str) -> int:
-			return self.cols.index(col_name)
-
-		def select_col(self, col_name: str) -> str:
-			return f"SELECT {col_name} FROM test"
-
-		@property
-		def select_all(self) -> str:
-			return "SELECT * FROM test"
-
+def test_conn_iter_rows(conn: Connection) -> None:
 	def is_compiled(language: str) -> bool:
 		return language in ("Rust", "C", "Go")
 
-	with Connection(":memory:") as conn:
+	with conn:
 		with conn.__cursor__() as cur:
 			cur.execute(
 				"CREATE TABLE test (name TEXT, surname TEXT, language TEXT)"
@@ -111,8 +94,8 @@ def test_conn_iter_rows() -> None:
 				("Bill", "Gates", "TypeScript"),
 			)
 
-		out1 = tuple(conn.iter_rows(MockSelectable()))
-		out2 = tuple(conn.iter_rows(MockSelectable(), language=is_compiled))
+		out1 = tuple(conn.iter_rows("test"))
+		out2 = tuple(conn.iter_rows("test", language=is_compiled))
 
 	assert out1 == (
 		("Linus", "Torvalds", "C"),
