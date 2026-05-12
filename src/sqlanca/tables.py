@@ -1,9 +1,6 @@
 from typing import Any, Protocol
 
 
-class TableError(ValueError): ...
-
-
 class Column[T](Protocol):
 	@property
 	def name(self) -> str: ...

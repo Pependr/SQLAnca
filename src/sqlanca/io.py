@@ -1,19 +1,10 @@
+import contextlib as cl
+import os
 import sqlite3 as sql
-from contextlib import ExitStack, contextmanager
-from os import PathLike
+import types as ts
 from typing import Any, Callable, Generator, Protocol, Self
 
 type PredicateFn = Callable[[Any], bool]
-
-
-def compose(*predicates: PredicateFn) -> PredicateFn:
-	def predicate(value: Any) -> bool:
-		for pr in predicates:
-			if not pr(value):
-				return False
-		return True
-
-	return predicate
 
 
 class Creatable(Protocol):
@@ -28,7 +19,7 @@ class Insertable(Protocol):
 
 
 class Connection:
-	def __init__(self, path: str | PathLike[Any]) -> None:
+	def __init__(self, path: str | os.PathLike[Any]) -> None:
 		self.__path__ = path
 
 	def __enter__(self) -> Self:
@@ -37,23 +28,24 @@ class Connection:
 
 	def __exit__(
 		self,
-		exc_type: type[Exception] | None,
-		exc: Exception | None,
-		tb: Any,
+		exc_type: type[BaseException] | None,
+		exc_value: BaseException | None,
+		traceback: ts.TracebackType | None,
+		/,
 	) -> None:
-		if exc is not None:
+		if exc_value is not None:
 			self.__conn__.rollback()
 		else:
 			self.__conn__.commit()
 		self.__conn__.close()
 
-	@contextmanager
+	@cl.contextmanager
 	def __cursor__(self) -> Generator[sql.Cursor, None, None]:
 		cur = self.__conn__.cursor()
 		yield cur
 		cur.close()
 
-	@contextmanager
+	@cl.contextmanager
 	def __func__(
 		self, fn: Callable[[Any], Any], name: str
 	) -> Generator[None, None, None]:
@@ -70,39 +62,51 @@ class Connection:
 			cur.execute(*table.insert_query(kwargs))
 
 	def iter_column(
-		self,
-		table_name: str,
-		col_name: str,
-		predicate: PredicateFn = lambda _: True,
+		self, table_name: str, col_name: str
 	) -> Generator[Any, None, None]:
-		with self.__func__(predicate, f"{col_name}_pred"):
-			with self.__cursor__() as cur:
-				cur.execute(
-					f"""SELECT {col_name} FROM {table_name}
-					WHERE {col_name}_pred({col_name})=1"""
-				)
+		with self.__cursor__() as cur:
+			cur.execute(f"SELECT {col_name} FROM {table_name}")
+			yield from (i[0] for i in cur.fetchall())
 
-				yield from (i[0] for i in cur.fetchall())
+	def filter_column(
+		self, table_name: str, col_name: str, predicate: PredicateFn
+	) -> Generator[Any, None, None]:
+		with cl.ExitStack() as stack:
+			stack.enter_context(self.__func__(predicate, f"{col_name}_pred"))
+
+			cur = stack.enter_context(self.__cursor__())
+
+			cur.execute(
+				f"""SELECT {col_name} FROM {table_name}
+				WHERE {col_name}_pred({col_name})=1"""
+			)
+
+			yield from (i[0] for i in cur.fetchall())
 
 	def iter_rows(
+		self, table_name: str
+	) -> Generator[tuple[Any, ...], None, None]:
+		with self.__cursor__() as cur:
+			cur.execute(f"SELECT * FROM {table_name}")
+			yield from cur.fetchall()
+
+	def filter_rows(
 		self, table_name: str, **predicates: PredicateFn
 	) -> Generator[tuple[Any, ...], None, None]:
 		if predicates == {}:
-			with self.__cursor__() as cur:
-				cur.execute(f"SELECT * FROM {table_name}")
-				yield from cur.fetchall()
-				return
+			raise ValueError("No filters provided")
 
-		with ExitStack() as stack:
+		with cl.ExitStack() as stack:
 			for col, fn in predicates.items():
 				stack.enter_context(self.__func__(fn, f"{col}_pred"))
 
-			with self.__cursor__() as cur:
-				cur.execute(
-					f"""
-					SELECT * FROM {table_name}
-					WHERE {" AND ".join(f"{col}_pred({col})" for col in predicates)}
-					"""
-				)
+			cur = stack.enter_context(self.__cursor__())
 
-				yield from cur.fetchall()
+			cur.execute(
+				f"""
+				SELECT * FROM {table_name}
+				WHERE {" AND ".join(f"{col}_pred({col})" for col in predicates)}
+				"""
+			)
+
+			yield from cur.fetchall()

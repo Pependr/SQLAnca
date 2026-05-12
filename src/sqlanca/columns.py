@@ -1,6 +1,6 @@
+import types as ts
 from dataclasses import KW_ONLY, dataclass
 from enum import StrEnum
-from types import EllipsisType
 from typing import Callable
 
 type ValidatorFn[T] = Callable[[T], bool]
@@ -31,7 +31,7 @@ class Column[T]:
 	name: str
 	type: Type
 	_: KW_ONLY
-	default: T | EllipsisType = ...
+	default: T | ts.EllipsisType = ...
 	not_null: bool = False
 	unique: bool = False
 	primary_key: bool = False

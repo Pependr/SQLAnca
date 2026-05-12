@@ -12,6 +12,7 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+    "pytest-cov>=7.1.0",
     "pytest>=9.0.3",
     "ruff>=0.15.12",
 ]
@@ -66,8 +67,29 @@ docstring-code-line-length = 100
 ruff = { "parenthesize-tuple-in-subscript" = true }
 pylint = { "max-nested-blocks" = 4, "max-args" = 4 }
 pyupgrade = { "keep-runtime-typing" = true }
-isort = { lines-after-imports = 1 }
+flake8-type-checking = { strict = true }
 typing-extensions = false
+typing-modules = ["typing", "types", "collections.abc"]
+
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+lines-between-types = 1
+section-order = [
+    "future",
+    "testing",
+    "third-party",
+    "standard-library",
+    "typing",
+    "first-party",
+    "local-folder",
+]
+length-sort = true
+
+
+[tool.ruff.lint.isort.sections]
+testing = ["pytest"]
+typing = ["typing", "types", "collections.abc"]
 
 
 [tool.ruff]

@@ -27,4 +27,4 @@ jobs:
               run: uv run ruff format --check
 
             - name: "Run Pytest tests"
-              run: uv run pytest
+              run: uv run pytest --cov

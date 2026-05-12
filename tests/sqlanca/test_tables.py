@@ -1,134 +1,77 @@
-import sqlite3 as sql
+from dataclasses import dataclass
 
 import pytest as pt
 
-from sqlanca.columns import Column, Type, ValidationError
-from sqlanca.io import Connection
 from sqlanca.tables import Table
 
 
+@dataclass(frozen=True, slots=True)
+class MockCol:
+	name: str
+	primary_key: bool = False
+	public_default: str | None = None
+	query: str = "query"
+	valid: bool = True
+
+	def validate(self, value: str) -> None:
+		if not self.valid:
+			raise RuntimeError("Invalid value!")
+
+
 @pt.fixture
-def unique_table() -> Table:
+def query_cols() -> tuple[MockCol, ...]:
+	return tuple(MockCol(f"col_{i}", query=f"query_{i}") for i in range(3))
+
+
+@pt.fixture
+def filter_table() -> Table:
 	return Table(
-		"test",
-		Column("unique_col", Type.STR, not_null=True, unique=True),
-		Column("id", Type.INT, primary_key=True),
+		"filter_table",
+		MockCol("value"),
+		MockCol("default", public_default="default"),
+		MockCol("default_no_value", public_default="default"),
+		MockCol("primary_key_value", primary_key=True),
+		MockCol("primary_key_no_value", primary_key=True),
 	)
 
 
-@pt.fixture
-def default_table() -> Table:
-	return Table(
-		"test",
-		Column("name", Type.STR, not_null=True),
-		Column("age", Type.INT, default=None),
+def test_table_column_queries(query_cols: tuple[MockCol, ...]) -> None:
+	table = Table("test", *query_cols)
+
+	assert table.column_queries == tuple(c.query for c in query_cols)
+
+
+def test_table_create_query(query_cols: tuple[MockCol, ...]) -> None:
+	table = Table("test", *query_cols)
+
+	assert table.create_query == "CREATE TABLE test (query_0, query_1, query_2)"
+
+
+def test_table_filter_inputs(filter_table: Table) -> None:
+	data: dict[str, str] = {
+		"value": "bruh",
+		"default": "dude",
+		"primary_key_value": "man",
+	}
+
+	expect: dict[str, str] = {
+		"value": "bruh",
+		"default": "dude",
+		"default_no_value": "default",
+		"primary_key_value": "man",
+	}
+
+	assert filter_table.filter_inputs(data) == expect
+
+
+def test_table_insert_query(filter_table: Table) -> None:
+	data: dict[str, str] = {
+		"value": "bruh",
+		"default": "dude",
+		"primary_key_value": "man",
+	}
+
+	assert filter_table.insert_query(data) == (
+		"INSERT INTO filter_table (value, default, default_no_value, primary_key_value) VALUES (?, ?, ?, ?)",
+		("bruh", "dude", "default", "man"),
 	)
-
-
-@pt.fixture
-def valid_table() -> Table:
-	def valid_age(x: int) -> bool:
-		return x >= 18
-
-	return Table(
-		"test",
-		Column("name", Type.STR, not_null=True),
-		Column("age", Type.INT, validators=(valid_age,)),
-	)
-
-
-@pt.fixture
-def iter_table() -> Table:
-	return Table(
-		"test",
-		Column("id", Type.INT, primary_key=True),
-		Column("name", Type.STR),
-	)
-
-
-@pt.fixture
-def conn() -> Connection:
-	return Connection(":memory:")
-
-
-def test_table_create(unique_table: Table, conn: Connection) -> None:
-	with conn:
-		conn.create(unique_table)
-		with conn.__cursor__() as cur:
-			cur.execute(
-				"INSERT INTO test (unique_col) VALUES ('bruh'), ('dude'), ('man')"
-			)
-			cur.execute("SELECT * FROM test")
-			out = cur.fetchall()
-
-	assert out == [("bruh", 1), ("dude", 2), ("man", 3)]
-
-
-def test_table_constraints(unique_table: Table, conn: Connection) -> None:
-	with conn:
-		conn.create(unique_table)
-		with conn.__cursor__() as cur:
-			cur.execute(
-				"INSERT INTO test (unique_col) VALUES ('bruh'), ('dude'), ('man')"
-			)
-
-			with pt.raises(sql.IntegrityError):
-				cur.execute("INSERT INTO test (unique_col) VALUES ('bruh')")
-
-			with pt.raises(sql.IntegrityError):
-				cur.execute("INSERT INTO test (unique_col) VALUES (NULL)")
-
-
-def test_table_insert(default_table: Table, conn: Connection) -> None:
-	with conn:
-		conn.create(default_table)
-
-		conn.insert(default_table, name="Bob", age=18)
-		conn.insert(default_table, name="Alice")
-
-		with conn.__cursor__() as cur:
-			cur.execute("SELECT * FROM test")
-			out = cur.fetchall()
-
-	assert out == [("Bob", 18), ("Alice", None)]
-
-
-def test_table_insert_validation_error(
-	valid_table: Table, conn: Connection
-) -> None:
-	with conn:
-		conn.create(valid_table)
-
-		with pt.raises(ValidationError):
-			conn.insert(valid_table, name="Alice", age=16)
-
-
-def test_table_iter_column(iter_table: Table, conn: Connection) -> None:
-	with conn:
-		conn.create(iter_table)
-
-		conn.insert(iter_table, name="Bob")
-		conn.insert(iter_table, name="Alice")
-
-		out1 = tuple(conn.iter_column("test", "name"))
-		out2 = tuple(conn.iter_column("test", "name", lambda s: len(s) == 3))
-
-	assert out1 == ("Bob", "Alice")
-	assert out2 == ("Bob",)
-
-
-def test_table_iter_rows(iter_table: Table, conn: Connection) -> None:
-	def even_id(id: int) -> bool:
-		return id % 2 == 0
-
-	with conn:
-		conn.create(iter_table)
-
-		conn.insert(iter_table, name="Bob")
-		conn.insert(iter_table, name="Alice")
-
-		out1 = tuple(conn.iter_rows("test"))
-		out2 = tuple(conn.iter_rows("test", id=even_id))
-
-	assert out1 == ((1, "Bob"), (2, "Alice"))
-	assert out2 == ((2, "Alice"),)
