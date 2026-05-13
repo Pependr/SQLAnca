@@ -1,11 +1,12 @@
-import sqlite3 as sql
-from typing import Generator
-
 import pytest as pt
 
-from sqlanca.columns import Column, Type, ValidationError
+import sqlite3 as sql
+
+from typing import Generator
+
 from sqlanca.io import Connection
 from sqlanca.tables import Table
+from sqlanca.columns import Type, Column, ValidationError
 
 
 @pt.fixture
@@ -107,8 +108,8 @@ def test_table_iter_column(iter_table: Table, conn: Connection) -> None:
 	conn.insert(iter_table, name="Bob")
 	conn.insert(iter_table, name="Alice")
 
-	out1 = tuple(conn.iter_column("test", "name"))
-	out2 = tuple(conn.filter_column("test", "name", lambda s: len(s) == 3))
+	out1 = conn.iter_column("test", "name")
+	out2 = conn.filter_column("test", "name", lambda s: len(s) == 3)
 
 	assert out1 == ("Bob", "Alice")
 	assert out2 == ("Bob",)
@@ -123,8 +124,8 @@ def test_table_iter_rows(iter_table: Table, conn: Connection) -> None:
 	conn.insert(iter_table, name="Bob")
 	conn.insert(iter_table, name="Alice")
 
-	out1 = tuple(conn.iter_rows("test"))
-	out2 = tuple(conn.filter_rows("test", id=even_id))
+	out1 = conn.iter_rows("test")
+	out2 = conn.filter_rows("test", id=even_id)
 
 	assert out1 == ((1, "Bob"), (2, "Alice"))
 	assert out2 == ((2, "Alice"),)

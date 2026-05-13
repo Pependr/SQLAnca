@@ -1,8 +1,11 @@
-import contextlib as cl
 import os
 import sqlite3 as sql
+import contextlib as cl
+
 import types as ts
-from typing import Any, Callable, Generator, Protocol, Self
+
+from typing import Any, Self, Callable, Protocol, Generator
+
 
 type PredicateFn = Callable[[Any], bool]
 
@@ -61,16 +64,14 @@ class Connection:
 		with self.__cursor__() as cur:
 			cur.execute(*table.insert_query(kwargs))
 
-	def iter_column(
-		self, table_name: str, col_name: str
-	) -> Generator[Any, None, None]:
+	def iter_column(self, table_name: str, col_name: str) -> tuple[Any, ...]:
 		with self.__cursor__() as cur:
 			cur.execute(f"SELECT {col_name} FROM {table_name}")
-			yield from (i[0] for i in cur.fetchall())
+			return tuple(i[0] for i in cur.fetchall())
 
 	def filter_column(
 		self, table_name: str, col_name: str, predicate: PredicateFn
-	) -> Generator[Any, None, None]:
+	) -> tuple[Any, ...]:
 		with cl.ExitStack() as stack:
 			stack.enter_context(self.__func__(predicate, f"{col_name}_pred"))
 
@@ -81,18 +82,16 @@ class Connection:
 				WHERE {col_name}_pred({col_name})=1"""
 			)
 
-			yield from (i[0] for i in cur.fetchall())
+			return tuple(i[0] for i in cur.fetchall())
 
-	def iter_rows(
-		self, table_name: str
-	) -> Generator[tuple[Any, ...], None, None]:
+	def iter_rows(self, table_name: str) -> tuple[tuple[Any, ...], ...]:
 		with self.__cursor__() as cur:
 			cur.execute(f"SELECT * FROM {table_name}")
-			yield from cur.fetchall()
+			return tuple(cur.fetchall())
 
 	def filter_rows(
 		self, table_name: str, **predicates: PredicateFn
-	) -> Generator[tuple[Any, ...], None, None]:
+	) -> tuple[tuple[Any, ...], ...]:
 		if predicates == {}:
 			raise ValueError("No filters provided")
 
@@ -109,4 +108,4 @@ class Connection:
 				"""
 			)
 
-			yield from cur.fetchall()
+			return tuple(cur.fetchall())

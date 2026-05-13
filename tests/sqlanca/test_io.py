@@ -1,6 +1,6 @@
-from typing import Any, Generator
-
 import pytest as pt
+
+from typing import Any, Generator
 
 from sqlanca.io import Connection
 
@@ -75,21 +75,19 @@ def test_conn_insert(conn: Connection) -> None:
 
 
 def test_conn_iter_column(example_conn: Connection) -> None:
-	out = tuple(example_conn.iter_column("test", "language"))
+	out = example_conn.iter_column("test", "language")
 
 	assert out == ("C", "Python", "TypeScript")
 
 
 def test_conn_filter_column(example_conn: Connection) -> None:
-	out = tuple(
-		example_conn.filter_column("test", "name", lambda n: len(n) <= 5)
-	)
+	out = example_conn.filter_column("test", "name", lambda n: len(n) <= 5)
 
 	assert out == ("Linus", "Bill")
 
 
 def test_conn_iter_rows(example_conn: Connection) -> None:
-	out = tuple(example_conn.iter_rows("test"))
+	out = example_conn.iter_rows("test")
 
 	assert out == (
 		("Linus", "Torvalds", "C"),
@@ -102,6 +100,6 @@ def test_conn_filter_rows(example_conn: Connection) -> None:
 	def is_compiled(language: str) -> bool:
 		return language in ("Rust", "C", "Go")
 
-	out = tuple(example_conn.filter_rows("test", language=is_compiled))
+	out = example_conn.filter_rows("test", language=is_compiled)
 
 	assert out == (("Linus", "Torvalds", "C"),)

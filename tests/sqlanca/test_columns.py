@@ -1,9 +1,10 @@
-import itertools as it
-from typing import Sized
-
 import pytest as pt
 
-from sqlanca.columns import Column, ColumnError, Type, ValidationError
+import itertools as it
+
+from typing import Sized
+
+from sqlanca.columns import Type, Column, ColumnError, ValidationError
 
 
 def test_column_validation() -> None:

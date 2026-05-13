@@ -1,7 +1,10 @@
-import types as ts
-from dataclasses import KW_ONLY, dataclass
 from enum import StrEnum
+from dataclasses import KW_ONLY, dataclass
+
+import types as ts
+
 from typing import Callable
+
 
 type ValidatorFn[T] = Callable[[T], bool]
 
