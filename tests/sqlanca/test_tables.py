@@ -1,6 +1,6 @@
-from dataclasses import dataclass
-
 import pytest as pt
+
+from dataclasses import dataclass
 
 from sqlanca.tables import Table
 
@@ -75,3 +75,18 @@ def test_table_insert_query(filter_table: Table) -> None:
 		"INSERT INTO filter_table (value, default, default_no_value, primary_key_value) VALUES (?, ?, ?, ?)",
 		("bruh", "dude", "default", "man"),
 	)
+
+
+def test_validation_error() -> None:
+	invalid_table = Table(
+		"test",
+		MockCol("invalid", valid=False),
+	)
+
+	data: dict[str, str] = {"invalid": "invalid"}
+
+	with pt.raises(RuntimeError, match="Invalid value!"):
+		invalid_table.filter_inputs(data)
+
+	with pt.raises(RuntimeError, match="Invalid value!"):
+		invalid_table.insert_query(data)
